@@ -25,6 +25,48 @@ export function refreshRevokedCache() {
 // Initialize cache on startup
 refreshRevokedCache();
 
+// 0. Validate Device Identifier Uniqueness before installation
+agentRouter.get('/validate-identifier', (req: Request, res: Response): Response | void => {
+  const identifier = String(req.query.id || req.query.identifier || '').trim();
+  const hostname = String(req.query.hostname || '').trim();
+
+  if (!identifier) {
+    return res.status(400).json({ available: false, error: 'Laptop ID is required' });
+  }
+
+  // Look for any existing device with this identifier
+  const existing = db.prepare(`
+    SELECT d.id, d.device_identifier, d.hostname, d.status, e.name as employee_name
+    FROM devices d
+    LEFT JOIN device_assignments da ON da.device_id = d.id AND da.is_active = 1
+    LEFT JOIN employees e ON e.id = da.employee_id
+    WHERE LOWER(d.device_identifier) = LOWER(?)
+    LIMIT 1
+  `).get(identifier) as any;
+
+  if (!existing) {
+    return res.json({ available: true, message: `Laptop ID '${identifier}' is available` });
+  }
+
+  // If found, check if it's the SAME laptop reinstalling (same hostname)
+  if (hostname && existing.hostname && existing.hostname.toLowerCase() === hostname.toLowerCase()) {
+    return res.json({
+      available: true,
+      isReinstall: true,
+      message: `Laptop ID '${identifier}' belongs to this laptop (${hostname}). Re-enrollment allowed.`
+    });
+  }
+
+  // Otherwise, it is a DUPLICATE assigned to another device!
+  return res.json({
+    available: false,
+    error: `Laptop ID '${identifier}' is ALREADY in use by another laptop!`,
+    existingHostname: existing.hostname,
+    existingEmployee: existing.employee_name || 'Unassigned',
+    existingStatus: existing.status
+  });
+});
+
 // 1. Device Registration Handshake
 agentRouter.post('/register', (req: Request, res: Response): Response | void => {
   const { hostname, osVersion, serialNumber, macAddress, enrollmentSecret } = req.body;
@@ -55,12 +97,25 @@ agentRouter.post('/register', (req: Request, res: Response): Response | void => 
   const tokenHash = bcrypt.hashSync(rawToken, 10);
   const now = new Date().toISOString();
 
+  // Check if this physical laptop (hostname) was previously registered
   const existing = db.prepare(`
-    SELECT id, status, secret_hash, device_identifier FROM devices 
-    WHERE device_identifier = ? OR LOWER(hostname) = LOWER(?)
-    ORDER BY CASE WHEN device_identifier = ? THEN 0 ELSE 1 END, last_seen_at DESC
+    SELECT id, status, secret_hash, device_identifier, hostname FROM devices 
+    WHERE LOWER(hostname) = LOWER(?)
     LIMIT 1
-  `).get(deviceIdentifier, hostname, deviceIdentifier) as { id: string; status: string; device_identifier: string } | undefined;
+  `).get(hostname) as { id: string; status: string; device_identifier: string; hostname: string } | undefined;
+
+  // Check if deviceIdentifier is already claimed by a DIFFERENT physical laptop
+  const idCollision = db.prepare(`
+    SELECT id, hostname FROM devices 
+    WHERE LOWER(device_identifier) = LOWER(?) AND LOWER(hostname) != LOWER(?)
+    LIMIT 1
+  `).get(deviceIdentifier, hostname) as { id: string; hostname: string } | undefined;
+
+  if (idCollision) {
+    const shortHost = String(hostname).replace(/[^a-zA-Z0-9]/g, '').substring(0, 6);
+    deviceIdentifier = `${deviceIdentifier}-${shortHost}`;
+    console.warn(`[Agent Register] Device identifier collision with host ${idCollision.hostname}. Auto-disambiguated to: ${deviceIdentifier}`);
+  }
 
   let deviceId: string;
 
