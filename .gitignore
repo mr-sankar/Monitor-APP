@@ -9,3 +9,4 @@ data/*.sqlite*
 temp_pack/
 !frontend/dist/
 !frontend/dist/**
+!KellaMonitor-Employee-Setup.zip
