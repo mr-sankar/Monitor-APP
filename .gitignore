@@ -1,5 +1,5 @@
 node_modules/
-dist/
+/dist/
 .env
 .DS_Store
 *.log
@@ -7,3 +7,5 @@ dist/
 *.sqlite
 data/*.sqlite*
 temp_pack/
+!frontend/dist/
+!frontend/dist/**
