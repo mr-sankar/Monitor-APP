@@ -9,6 +9,17 @@ export const employeeRouter = Router();
 employeeRouter.use(authenticateAdmin);
 
 employeeRouter.get('/', (req: AuthenticatedAdminRequest, res: Response): Response | void => {
+  const isSimple = req.query.simple === 'true' || req.query.lite === 'true';
+  if (isSimple) {
+    const simpleList = db.prepare(`
+      SELECT id, emp_code as empCode, name, email, department, status
+      FROM employees
+      WHERE id != 'emp-unassigned'
+      ORDER BY name ASC
+    `).all();
+    return res.json({ employees: simpleList });
+  }
+
   const today = new Date().toISOString().substring(0, 10);
   const onlineCutoff = new Date(Date.now() - 90 * 1000).toISOString(); // 90 seconds (online margin)
 
