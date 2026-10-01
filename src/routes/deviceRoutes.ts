@@ -153,10 +153,35 @@ deviceRouter.get('/:id/activity', (req: AuthenticatedAdminRequest, res: Response
   const onlineCutoff = new Date(Date.now() - 90 * 1000).toISOString();
   const isOnline = device.last_seen_at >= onlineCutoff;
 
-  // Daily summary for this device
-  const summary = db.prepare(`
-    SELECT * FROM daily_summaries WHERE device_id = ? AND date = ?
-  `).get(deviceId, date) as any;
+  // Refresh summary for the assigned employee so metrics are 100% up to date
+  if (device.employee_id && device.employee_id !== 'emp-unassigned') {
+    try {
+      updateDailySummary(device.employee_id, deviceId, date);
+    } catch {}
+  }
+
+  // Daily summary for this device & current assignment
+  let summary = null;
+  if (device.employee_id && device.employee_id !== 'emp-unassigned') {
+    summary = db.prepare(`
+      SELECT * FROM daily_summaries 
+      WHERE device_id = ? AND date = ? AND employee_id = ?
+      ORDER BY updated_at DESC LIMIT 1
+    `).get(deviceId, date, device.employee_id) as any;
+  }
+
+  if (!summary) {
+    summary = db.prepare(`
+      SELECT 
+        SUM(total_time_seconds) as total_time_seconds,
+        SUM(active_time_seconds) as active_time_seconds,
+        SUM(idle_time_seconds) as idle_time_seconds,
+        SUM(work_time_seconds) as work_time_seconds,
+        SUM(non_work_time_seconds) as non_work_time_seconds,
+        SUM(youtube_seconds) as youtube_seconds
+      FROM daily_summaries WHERE device_id = ? AND date = ?
+    `).get(deviceId, date) as any;
+  }
 
   // Recent activity stream for this device
   const events = db.prepare(`
@@ -205,8 +230,10 @@ deviceRouter.get('/:id/activity', (req: AuthenticatedAdminRequest, res: Response
       } : null
     },
     summary: summary || {
-      active_time_seconds: consolidated.filter(a => a.is_work === 1 && a.is_idle === 0).reduce((acc, a) => acc + a.duration_seconds, 0),
+      work_time_seconds: consolidated.filter(a => a.is_work === 1 && a.is_idle === 0).reduce((acc, a) => acc + a.duration_seconds, 0),
+      active_time_seconds: consolidated.filter(a => a.is_idle === 0).reduce((acc, a) => acc + a.duration_seconds, 0),
       idle_time_seconds: consolidated.filter(a => a.is_idle === 1).reduce((acc, a) => acc + a.duration_seconds, 0),
+      non_work_time_seconds: consolidated.filter(a => a.is_work === 0 && a.is_idle === 0).reduce((acc, a) => acc + a.duration_seconds, 0),
       total_time_seconds: consolidated.reduce((acc, a) => acc + a.duration_seconds, 0),
       youtube_seconds: consolidated.filter(a => a.category_id === 'cat-youtube' || (a.domain && a.domain.includes('youtube'))).reduce((acc, a) => acc + a.duration_seconds, 0),
       top_apps_json: summary?.top_apps_json || '[]',
