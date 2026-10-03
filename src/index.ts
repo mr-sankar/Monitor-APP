@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { initDatabase } from './db/database.js';
+import { db, initDatabase } from './db/database.js';
 import { seedDatabase } from './db/seed.js';
 import { authRouter } from './routes/authRoutes.js';
 import { agentRouter } from './routes/agentRoutes.js';
@@ -128,7 +128,7 @@ if (process.env.NODE_ENV !== 'test') {
 
       db.prepare('DELETE FROM activity_events WHERE start_time < ?').run(cutoffDate);
       db.prepare('DELETE FROM daily_summaries WHERE date < ?').run(cutoffDayStr);
-      db.prepare('DELETE FROM alerts WHERE created_at < ?').run(cutoffDate);
+      db.prepare('DELETE FROM alerts WHERE triggered_at < ?').run(cutoffDate);
       db.prepare('DELETE FROM audit_logs WHERE created_at < ?').run(cutoffDate);
 
       console.log(`[Retention Policy] Enforced ${days}-day retention limit. Retaining all historical logs from past ${days} days.`);

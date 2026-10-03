@@ -1,20 +1,34 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import fs from 'node:fs';
+import { PostgresAdapter, IDatabaseSync } from './pgAdapter.js';
 
-const dataDir = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+let dbInstance: IDatabaseSync;
+
+const pgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.PGDATABASE_URL;
+
+if (pgUrl) {
+  console.log('[Database] DATABASE_URL detected. Initializing PostgreSQL adapter...');
+  dbInstance = new PostgresAdapter(pgUrl);
+} else {
+  const dataDir = path.resolve(process.cwd(), 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const dbPath = process.env.DB_PATH || path.join(dataDir, 'productivity.db');
+  const sqlite = new DatabaseSync(dbPath);
+
+  // Enable WAL mode for high concurrency
+  sqlite.exec('PRAGMA journal_mode = WAL;');
+  sqlite.exec('PRAGMA synchronous = NORMAL;');
+  sqlite.exec('PRAGMA foreign_keys = ON;');
+  sqlite.exec('PRAGMA busy_timeout = 10000;');
+
+  dbInstance = sqlite as unknown as IDatabaseSync;
 }
 
-const dbPath = process.env.DB_PATH || path.join(dataDir, 'productivity.db');
-export const db = new DatabaseSync(dbPath);
-
-// Enable WAL mode for high concurrency
-db.exec('PRAGMA journal_mode = WAL;');
-db.exec('PRAGMA synchronous = NORMAL;');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec('PRAGMA busy_timeout = 10000;');
+export const db = dbInstance;
 
 export function initDatabase() {
   db.exec(`
