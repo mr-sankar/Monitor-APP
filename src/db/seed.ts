@@ -1,6 +1,7 @@
 import { db, initDatabase } from './database.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { updateDailySummary } from '../services/aggregator.js';
 
 export function seedDatabase() {
   initDatabase();
@@ -215,8 +216,13 @@ export function seedDatabase() {
 
   // 7. System Default Unassigned Pool & Initial Employees
   const insertEmp = db.prepare(`
-    INSERT OR IGNORE INTO employees (id, emp_code, name, email, department, status, created_at)
+    INSERT INTO employees (id, emp_code, name, email, department, status, created_at)
     VALUES (?, ?, ?, ?, ?, 'active', ?)
+    ON CONFLICT (id) DO UPDATE SET
+      emp_code = excluded.emp_code,
+      name = excluded.name,
+      email = excluded.email,
+      department = excluded.department
   `);
   insertEmp.run(
     'emp-unassigned',
@@ -227,10 +233,37 @@ export function seedDatabase() {
     nowIso
   );
 
-  const initialEmployees: Array<{ id: string; emp_code: string; name: string; email: string; department: string }> = [];
+  const initialEmployees: Array<{ id: string; emp_code: string; name: string; email: string; department: string; defaultDevice?: string }> = [
+    { id: '60cf4763-4ca6-4a31-ab11-7fea7b4f5a69', emp_code: 'CUSTQ017', name: 'K SANKARA RAO', email: 'sankarkella9@gmail.com', department: 'IT Operations', defaultDevice: 'PAR-MB-001' },
+    { id: 'c4613145-5806-4b84-b4f5-8c8abfd22484', emp_code: 'CUSTQ091', name: 'R MOHAN BABU', email: 'mohanbabu0971@gmail.com', department: 'IT Operations', defaultDevice: 'PAR-MB-010' },
+    { id: '6062a71a-4b91-4996-82bb-090465aef016', emp_code: 'CustQ082', name: 'Goutham', email: 'goutham@gmail.com', department: 'IT Operations', defaultDevice: 'DESKTOP-BSEKVR3' },
+    { id: 'b0b78c3d-2a14-4d17-baf9-370b16b32b61', emp_code: 'CustQ 088', name: 'Aditya', email: 'aditya@gmail.com', department: 'IT Operations', defaultDevice: 'PAR-MB-009' },
+    { id: 'emp-harshitha', emp_code: 'CustQ095', name: 'CH HARSHITHA', email: 'harshitha@gmail.com', department: 'IT Operations', defaultDevice: 'PAR-MB-015' },
+    { id: 'emp-latha', emp_code: 'CustQ099', name: 'K LATHA REDDY', email: 'latha@gmail.com', department: 'IT Operations', defaultDevice: 'PAR-MB-002' }
+  ];
 
   for (const emp of initialEmployees) {
     insertEmp.run(emp.id, emp.emp_code, emp.name, emp.email, emp.department, nowIso);
+  }
+
+  // Auto-link devices to their designated employees if currently unassigned
+  const today = nowIso.substring(0, 10);
+  for (const emp of initialEmployees) {
+    if (!emp.defaultDevice) continue;
+    const dev = db.prepare('SELECT id, device_identifier, hostname FROM devices WHERE device_identifier = ? OR hostname = ?').get(emp.defaultDevice, emp.defaultDevice) as any;
+    if (dev) {
+      const activeAssign = db.prepare('SELECT id FROM device_assignments WHERE device_id = ? AND is_active = 1').get(dev.id);
+      if (!activeAssign) {
+        db.prepare(`
+          INSERT INTO device_assignments (id, device_id, employee_id, assigned_at, is_active)
+          VALUES (?, ?, ?, ?, 1)
+        `).run(uuidv4(), dev.id, emp.id, nowIso);
+
+        // Reassign any unassigned activity events from today to this employee
+        db.prepare("UPDATE activity_events SET employee_id = ? WHERE device_id = ? AND employee_id = 'emp-unassigned'").run(emp.id, dev.id);
+        updateDailySummary(emp.id, dev.id, today);
+      }
+    }
   }
 
   // 8. Restricted Applications (App Blocker) - Seeded once only, never overrides user changes
