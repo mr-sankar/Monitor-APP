@@ -1,7 +1,6 @@
 import { db, initDatabase } from './database.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { updateDailySummary } from '../services/aggregator.js';
 
 export function seedDatabase() {
   initDatabase();
@@ -233,11 +232,7 @@ export function seedDatabase() {
     nowIso
   );
 
-  const initialEmployees: Array<{ id: string; emp_code: string; name: string; email: string; department: string }> = [
-    { id: '60cf4763-4ca6-4a31-ab11-7fea7b4f5a69', emp_code: 'CUSTQ017', name: 'K SANKARA RAO', email: 'sankarkella9@gmail.com', department: 'IT Operations' },
-    { id: 'emp-harshitha', emp_code: 'CustQ095', name: 'CH HARSHITHA', email: 'harshitha@gmail.com', department: 'IT Operations' },
-    { id: 'emp-latha', emp_code: 'CustQ099', name: 'K LATHA REDDY', email: 'latha@gmail.com', department: 'IT Operations' }
-  ];
+  const initialEmployees: Array<{ id: string; emp_code: string; name: string; email: string; department: string }> = [];
 
   for (const emp of initialEmployees) {
     insertEmp.run(emp.id, emp.emp_code, emp.name, emp.email, emp.department, nowIso);
