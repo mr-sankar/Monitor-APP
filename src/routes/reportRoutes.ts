@@ -6,6 +6,14 @@ import { updateDailySummary } from '../services/aggregator.js';
 export const reportRouter = Router();
 reportRouter.use(authenticateAdmin);
 
+function formatDurationHms(seconds: number): string {
+  if (!seconds || seconds <= 0) return '0h 00m';
+  const totalMins = Math.round(seconds / 60);
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return `${h}h ${m < 10 ? '0' : ''}${m}m`;
+}
+
 // 1. Productivity Summary Report
 reportRouter.get('/productivity', (req: AuthenticatedAdminRequest, res: Response): Response | void => {
   const today = new Date().toISOString().substring(0, 10);
@@ -82,6 +90,10 @@ reportRouter.get('/productivity', (req: AuthenticatedAdminRequest, res: Response
       idleHours: +(r.idle_time_seconds / 3600).toFixed(2),
       workHours: +(workSecs / 3600).toFixed(2),
       nonWorkHours: +(nonWorkSecs / 3600).toFixed(2),
+      activeFormatted: formatDurationHms(active),
+      workFormatted: formatDurationHms(workSecs),
+      idleFormatted: formatDurationHms(r.idle_time_seconds || 0),
+      nonWorkFormatted: formatDurationHms(nonWorkSecs),
       youtubeMinutes: Math.round(r.youtube_seconds / 60),
       socialMediaMinutes: Math.round(r.social_media_seconds / 60),
       entertainmentMinutes: Math.round(r.entertainment_seconds / 60),
@@ -155,15 +167,15 @@ reportRouter.get('/export-csv', (req: AuthenticatedAdminRequest, res: Response):
   `).all(startDate, endDate) as Array<any>;
 
   const headers = [
-    'Date',
+    'Date (YYYY-MM-DD)',
     'Employee Code',
     'Employee Name',
     'Department',
     'Device ID',
-    'Active Hours',
-    'Idle Hours',
-    'Work Hours',
-    'Non-Work Hours',
+    'Active Time',
+    'Work Time',
+    'Idle Time',
+    'Non-Work Time',
     'Work Utilization %',
     'YouTube (Mins)',
     'Social Media (Mins)'
@@ -177,16 +189,16 @@ reportRouter.get('/export-csv', (req: AuthenticatedAdminRequest, res: Response):
     const util = active > 0 ? Math.round((work / active) * 100) : 0;
 
     csvRows.push([
-      r.date,
+      `"${r.date}"`,
       `"${r.emp_code}"`,
       `"${r.employee_name}"`,
       `"${r.department}"`,
       `"${r.device_identifier}"`,
-      (active / 3600).toFixed(2),
-      (r.idle_time_seconds / 3600).toFixed(2),
-      (work / 3600).toFixed(2),
-      (r.non_work_time_seconds / 3600).toFixed(2),
-      `${util}%`,
+      `"${formatDurationHms(active)}"`,
+      `"${formatDurationHms(work)}"`,
+      `"${formatDurationHms(r.idle_time_seconds || 0)}"`,
+      `"${formatDurationHms(r.non_work_time_seconds || 0)}"`,
+      `"${util}%"`,
       Math.round(r.youtube_seconds / 60),
       Math.round(r.social_media_seconds / 60)
     ].join(','));
