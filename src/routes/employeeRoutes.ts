@@ -38,7 +38,10 @@ employeeRouter.get('/', (req: AuthenticatedAdminRequest, res: Response): Respons
     LEFT JOIN device_live_status ls ON ls.device_id = d.id
     LEFT JOIN daily_summaries ds ON ds.employee_id = e.id AND ds.date = ?
     WHERE e.id != 'emp-unassigned'
-    GROUP BY e.id
+    GROUP BY 
+      e.id, e.emp_code, e.name, e.email, e.department, e.status, e.created_at,
+      d.id, d.device_identifier, d.hostname, d.os_version, d.last_seen_at,
+      ls.app_name, ls.window_title, ls.domain, ls.is_idle
     ORDER BY e.emp_code ASC
   `).all(today) as Array<any>;
 
@@ -150,7 +153,8 @@ employeeRouter.post('/', (req: AuthenticatedAdminRequest, res: Response): Respon
     logAuditAction(req, 'CREATE_EMPLOYEE', 'employees', id, { empCode, name, email });
     return res.status(201).json({ id, empCode, name, email, department });
   } catch (err: any) {
-    return res.status(400).json({ error: 'Employee code or email already exists' });
+    console.error('[CreateEmployee ERROR]:', err);
+    return res.status(400).json({ error: err.message || 'Employee code or email already exists' });
   }
 });
 

@@ -49,7 +49,7 @@ settingRouter.get('/categories', (req: AuthenticatedAdminRequest, res: Response)
     SELECT c.*, COUNT(r.id) as rule_count
     FROM categories c
     LEFT JOIN category_rules r ON r.category_id = c.id
-    GROUP BY c.id
+    GROUP BY c.id, c.name, c.color, c.is_work, c.description
   `).all();
 
   const rules = db.prepare(`

@@ -69,7 +69,7 @@ dashboardRouter.get('/top-apps', (req: AuthenticatedAdminRequest, res: Response)
     FROM activity_events e
     JOIN categories c ON e.category_id = c.id
     WHERE (e.start_time >= ? AND e.start_time <= ?) AND is_idle = 0
-    GROUP BY name, c.name, c.color, c.is_work
+    GROUP BY COALESCE(app_name, process_name), c.name, c.color, c.is_work
     ORDER BY duration_seconds DESC
     LIMIT 10
   `).all(startIso, endIso) as Array<{
