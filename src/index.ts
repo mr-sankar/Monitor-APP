@@ -117,6 +117,28 @@ if (process.env.NODE_ENV !== 'test') {
       console.error('[Watchdog] Error checking device disconnections:', err);
     }
   }, 30 * 1000);
+
+  // 90-Day Data Retention Policy: Enforce on startup and every 24 hours
+  function enforceDataRetention() {
+    try {
+      const setting = db.prepare("SELECT value FROM system_settings WHERE key = 'data_retention_days'").get() as { value: string } | undefined;
+      const days = parseInt(setting?.value || '90', 10);
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const cutoffDayStr = cutoffDate.substring(0, 10);
+
+      db.prepare('DELETE FROM activity_events WHERE start_time < ?').run(cutoffDate);
+      db.prepare('DELETE FROM daily_summaries WHERE date < ?').run(cutoffDayStr);
+      db.prepare('DELETE FROM alerts WHERE created_at < ?').run(cutoffDate);
+      db.prepare('DELETE FROM audit_logs WHERE created_at < ?').run(cutoffDate);
+
+      console.log(`[Retention Policy] Enforced ${days}-day retention limit. Retaining all historical logs from past ${days} days.`);
+    } catch (err) {
+      console.error('[Retention Policy Error]:', err);
+    }
+  }
+
+  enforceDataRetention();
+  setInterval(enforceDataRetention, 24 * 60 * 60 * 1000);
 }
 
 export default app;
