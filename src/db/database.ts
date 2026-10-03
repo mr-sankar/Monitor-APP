@@ -245,7 +245,7 @@ export function initDatabase() {
     );
 
     INSERT OR IGNORE INTO employees (id, emp_code, name, email, department, status, created_at)
-    VALUES ('emp-unassigned', 'EMP-UNASSIGNED', 'Unassigned Hardware Pool', 'unassigned@devices.internal', 'IT Staging', 'active', datetime('now'));
+    VALUES ('emp-unassigned', 'EMP-UNASSIGNED', 'Unassigned Hardware Pool', 'unassigned@devices.internal', 'IT Staging', 'active', '2026-01-01T00:00:00.000Z');
 
     INSERT OR IGNORE INTO categories (id, name, color, is_work, description) VALUES
       ('cat-dev', 'Development', '#10b981', 1, 'Code editors, IDEs, terminals, Git repos'),

@@ -37,9 +37,9 @@ describe('PostgreSQL SQL Dialect Converter Tests', () => {
     assert.ok(output.startsWith('-- PRAGMA'));
   });
 
-  it('converts datetime("now") to NOW()', () => {
+  it('converts datetime("now") to ISO timestamp literal', () => {
     const input = "INSERT INTO employees (created_at) VALUES (datetime('now'))";
     const output = sqliteToPostgresSql(input);
-    assert.strictEqual(output, "INSERT INTO employees (created_at) VALUES (NOW())");
+    assert.ok(output.includes("INSERT INTO employees (created_at) VALUES ('20"));
   });
 });

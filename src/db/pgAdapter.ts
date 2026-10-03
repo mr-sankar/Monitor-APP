@@ -39,8 +39,8 @@ export function sqliteToPostgresSql(sql: string): string {
     }
   }
 
-  // Replace datetime('now')
-  transformed = transformed.replace(/datetime\('now'\)/gi, 'NOW()');
+  // Replace datetime('now') with an ISO timestamp string literal
+  transformed = transformed.replace(/datetime\('now'\)/gi, `'${new Date().toISOString()}'`);
 
   // Convert ? to $1, $2, etc. (skipping inside string literals)
   let paramIdx = 0;
