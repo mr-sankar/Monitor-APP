@@ -246,5 +246,23 @@ export function initDatabase() {
 
     INSERT OR IGNORE INTO employees (id, emp_code, name, email, department, status, created_at)
     VALUES ('emp-unassigned', 'EMP-UNASSIGNED', 'Unassigned Hardware Pool', 'unassigned@devices.internal', 'IT Staging', 'active', datetime('now'));
+
+    INSERT OR IGNORE INTO categories (id, name, color, is_work, description) VALUES
+      ('cat-dev', 'Development', '#10b981', 1, 'Code editors, IDEs, terminals, Git repos'),
+      ('cat-comm', 'Communication', '#3b82f6', 1, 'Slack, Teams, Outlook, Zoom'),
+      ('cat-prod', 'Productivity', '#6366f1', 1, 'Word, Excel, Notion, Docs, Sheets, Project management'),
+      ('cat-work', 'Work', '#0ea5e9', 1, 'General work-related business applications'),
+      ('cat-youtube', 'YouTube', '#ef4444', 0, 'YouTube video streaming'),
+      ('cat-social', 'Social Media', '#f59e0b', 0, 'Facebook, Twitter/X, Instagram, LinkedIn, Reddit'),
+      ('cat-ent', 'Entertainment', '#ec4899', 0, 'Netflix, Spotify, Twitch, Games, Streaming'),
+      ('cat-shop', 'Shopping', '#8b5cf6', 0, 'E-commerce and shopping portals'),
+      ('cat-other', 'Other', '#6b7280', 0, 'Uncategorized or system utilities');
   `);
+}
+
+// Auto-initialize tables immediately so any subsequent module imports have ready schema
+try {
+  initDatabase();
+} catch (err) {
+  console.error('[Database Auto-Init Error]:', err);
 }

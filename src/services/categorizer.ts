@@ -46,8 +46,12 @@ export function refreshCategoryCache() {
   }>;
 }
 
-// Initial load
-refreshCategoryCache();
+// Initial load (safely wrapped so module import never fails if DB is initializing)
+try {
+  refreshCategoryCache();
+} catch (e) {
+  // Will be lazily refreshed upon first event or query
+}
 
 export function categorizeEvent(
   processName: string,

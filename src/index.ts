@@ -13,6 +13,7 @@ import { alertRouter } from './routes/alertRoutes.js';
 import { reportRouter } from './routes/reportRoutes.js';
 import { settingRouter } from './routes/settingRoutes.js';
 import { checkDeviceDisconnections } from './services/alertEngine.js';
+import { refreshCategoryCache } from './services/categorizer.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ process.on('unhandledRejection', (reason) => {
 // Initialize Database & Seeds
 initDatabase();
 seedDatabase();
+refreshCategoryCache();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
