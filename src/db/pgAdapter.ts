@@ -30,13 +30,17 @@ export function sqliteToPostgresSql(sql: string): string {
   if (/INSERT\s+OR\s+IGNORE\s+INTO/i.test(transformed)) {
     transformed = transformed.replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO');
     if (!/ON\s+CONFLICT/i.test(transformed)) {
-      // Append ON CONFLICT DO NOTHING before any trailing semicolon
       if (transformed.endsWith(';')) {
         transformed = transformed.slice(0, -1).trim() + ' ON CONFLICT DO NOTHING;';
       } else {
         transformed = transformed + ' ON CONFLICT DO NOTHING';
       }
     }
+  }
+
+  // Handle INSERT OR REPLACE
+  if (/INSERT\s+OR\s+REPLACE\s+INTO/i.test(transformed)) {
+    transformed = transformed.replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO');
   }
 
   // Replace datetime('now') with an ISO timestamp string literal

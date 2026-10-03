@@ -301,8 +301,12 @@ export function seedDatabase() {
   ];
 
   const insertSetting = db.prepare(`
-    INSERT OR REPLACE INTO system_settings (key, value, description, updated_at)
+    INSERT INTO system_settings (key, value, description, updated_at)
     VALUES (?, ?, ?, ?)
+    ON CONFLICT (key) DO UPDATE SET
+      value = excluded.value,
+      description = excluded.description,
+      updated_at = excluded.updated_at
   `);
 
   for (const s of settings) {

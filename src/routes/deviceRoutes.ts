@@ -239,8 +239,12 @@ deviceRouter.post('/:id/revoke', (req: AuthenticatedAdminRequest, res: Response)
   const dev = db.prepare('SELECT id, device_identifier, hostname FROM devices WHERE id = ?').get(deviceId) as { id: string; device_identifier: string; hostname: string } | undefined;
   if (dev) {
     db.prepare(`
-      INSERT OR REPLACE INTO revoked_devices (id, device_identifier, hostname, reason, revoked_at)
+      INSERT INTO revoked_devices (id, device_identifier, hostname, reason, revoked_at)
       VALUES (?, ?, ?, 'Manually revoked by administrator', ?)
+      ON CONFLICT (device_identifier) DO UPDATE SET
+        hostname = excluded.hostname,
+        reason = excluded.reason,
+        revoked_at = excluded.revoked_at
     `).run(uuidv4(), dev.device_identifier, dev.hostname, new Date().toISOString());
     refreshRevokedCache();
   }
@@ -307,8 +311,12 @@ deviceRouter.post('/stop-all', (req: AuthenticatedAdminRequest, res: Response): 
   const now = new Date().toISOString();
   for (const d of allDevs) {
     db.prepare(`
-      INSERT OR REPLACE INTO revoked_devices (id, device_identifier, hostname, reason, revoked_at)
+      INSERT INTO revoked_devices (id, device_identifier, hostname, reason, revoked_at)
       VALUES (?, ?, ?, 'Stop-All triggered by admin', ?)
+      ON CONFLICT (device_identifier) DO UPDATE SET
+        hostname = excluded.hostname,
+        reason = excluded.reason,
+        revoked_at = excluded.revoked_at
     `).run(uuidv4(), d.device_identifier, d.hostname, now);
   }
   refreshRevokedCache();
