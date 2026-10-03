@@ -49,19 +49,9 @@ deviceRouter.get('/', (req: AuthenticatedAdminRequest, res: Response): Response 
     LEFT JOIN employees e ON e.id = da.employee_id
     LEFT JOIN device_live_status ls ON ls.device_id = d.id
     ORDER BY 
-      CASE 
-        -- Priority -1: Uninstalled or Tampered devices (CRITICAL - TOP OF LIST)
-        WHEN d.status = 'uninstalled' THEN -1
-        -- Priority 0: Recently active agent that has STOPPED communicating for > 5 min
-        WHEN d.status = 'active' AND d.last_seen_at < ? AND d.last_seen_at >= ? THEN 0
-        -- Priority 1: Currently online & healthy
-        WHEN d.status = 'active' AND d.last_seen_at >= ? THEN 1
-        -- Priority 2: Inactive, never seen, or revoked
-        ELSE 2
-      END ASC,
-      d.last_seen_at DESC,
-      d.registered_at DESC
-  `).all(stoppedCutoff, recentCutoff, onlineCutoff) as Array<any>;
+      d.registered_at DESC,
+      d.device_identifier DESC
+  `).all() as Array<any>;
 
   const formatElapsed = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s ago`;

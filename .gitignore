@@ -6,6 +6,10 @@ node_modules/
 *.zip
 *.sqlite
 data/*.sqlite*
+data/*.db*
+*.db
+*.db-wal
+*.db-shm
 temp_pack/
 !frontend/dist/
 !frontend/dist/**

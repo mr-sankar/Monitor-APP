@@ -257,6 +257,15 @@ employeeRouter.post('/:id/assign-device', (req: AuthenticatedAdminRequest, res: 
   return res.json({ success: true, assignmentId, employeeId, deviceId });
 });
 
+employeeRouter.post('/:id/unassign-device', (req: AuthenticatedAdminRequest, res: Response): Response | void => {
+  const employeeId = String(req.params.id);
+
+  db.prepare('DELETE FROM device_assignments WHERE employee_id = ?').run(employeeId);
+  logAuditAction(req, 'UNASSIGN_DEVICE', 'employees', employeeId);
+
+  return res.json({ success: true, message: 'Device unassigned from employee successfully' });
+});
+
 employeeRouter.delete('/:id', (req: AuthenticatedAdminRequest, res: Response): Response | void => {
   const employeeId = String(req.params.id);
 

@@ -227,55 +227,64 @@ export function seedDatabase() {
     nowIso
   );
 
-  const initialEmployees = [
-    { id: '60cf4763-4ca6-4a31-ab11-7fea7b4f5a69', emp_code: 'CUSTQ017', name: 'K SANKARA RAO', email: 'sankarkella9@gmail.com', department: 'IT Operations' },
-    { id: 'c4613145-5806-4b84-b4f5-8c8abfd22484', emp_code: 'CUSTQ091', name: 'R MOHAN BABU', email: 'mohanbabu0971@gmail.com', department: 'IT Operations' },
-    { id: '6062a71a-4b91-4996-82bb-090465aef016', emp_code: 'CustQ082', name: 'Goutham', email: 'goutham@gmail.com', department: 'IT Operations' },
-    { id: 'b0b78c3d-2a14-4d17-baf9-370b16b32b61', emp_code: 'CustQ 088', name: 'Aditya', email: 'aditya@gmail.com', department: 'IT Operations' }
-  ];
+  const initialEmployees: Array<{ id: string; emp_code: string; name: string; email: string; department: string }> = [];
 
   for (const emp of initialEmployees) {
     insertEmp.run(emp.id, emp.emp_code, emp.name, emp.email, emp.department, nowIso);
   }
 
-  // 8. Restricted Applications (App Blocker)
-  const defaultBlockedApps = [
-    { id: 'app-spotify', proc: 'spotify.exe', name: 'Spotify Music', cat: 'cat-ent' },
-    { id: 'app-steam', proc: 'steam.exe', name: 'Steam Gaming', cat: 'cat-ent' },
-    { id: 'app-discord', proc: 'discord.exe', name: 'Discord', cat: 'cat-comm' },
-    { id: 'app-epic', proc: 'epicgameslauncher.exe', name: 'Epic Games Launcher', cat: 'cat-ent' },
-    { id: 'app-utorrent', proc: 'utorrent.exe', name: 'uTorrent', cat: 'cat-ent' },
-    { id: 'app-telegram', proc: 'telegram.exe', name: 'Telegram Desktop', cat: 'cat-comm' }
-  ];
+  // 8. Restricted Applications (App Blocker) - Seeded once only, never overrides user changes
+  const appsSeeded = db.prepare("SELECT value FROM system_settings WHERE key = 'blocked_apps_initialized'").get();
+  if (!appsSeeded) {
+    const defaultBlockedApps = [
+      { id: 'app-spotify', proc: 'spotify.exe', name: 'Spotify Music', cat: 'cat-ent' },
+      { id: 'app-steam', proc: 'steam.exe', name: 'Steam Gaming', cat: 'cat-ent' },
+      { id: 'app-discord', proc: 'discord.exe', name: 'Discord', cat: 'cat-comm' },
+      { id: 'app-epic', proc: 'epicgameslauncher.exe', name: 'Epic Games Launcher', cat: 'cat-ent' },
+      { id: 'app-utorrent', proc: 'utorrent.exe', name: 'uTorrent', cat: 'cat-ent' },
+      { id: 'app-telegram', proc: 'telegram.exe', name: 'Telegram Desktop', cat: 'cat-comm' }
+    ];
 
-  const insertApp = db.prepare(`
-    INSERT INTO applications (id, process_name, display_name, category_id, is_blocked)
-    VALUES (?, ?, ?, ?, 1)
-    ON CONFLICT(process_name) DO UPDATE SET is_blocked = 1, display_name = excluded.display_name
-  `);
+    const insertApp = db.prepare(`
+      INSERT OR IGNORE INTO applications (id, process_name, display_name, category_id, is_blocked)
+      VALUES (?, ?, ?, ?, 1)
+    `);
 
-  for (const a of defaultBlockedApps) {
-    insertApp.run(a.id, a.proc, a.name, a.cat);
+    for (const a of defaultBlockedApps) {
+      insertApp.run(a.id, a.proc, a.name, a.cat);
+    }
+
+    db.prepare(`
+      INSERT INTO system_settings (key, value, description, updated_at)
+      VALUES ('blocked_apps_initialized', 'true', 'Default blocked applications initialized', ?)
+    `).run(nowIso);
   }
 
-  // 9. Restricted Websites / Domains (Auto-Close Tab)
-  const defaultBlockedDomains = [
-    { id: 'dom-youtube', domain: 'youtube.com', cat: 'cat-youtube' },
-    { id: 'dom-chatgpt', domain: 'chatgpt.com', cat: 'cat-youtube' },
-    { id: 'dom-netflix', domain: 'netflix.com', cat: 'cat-ent' },
-    { id: 'dom-tiktok', domain: 'tiktok.com', cat: 'cat-social' },
-    { id: 'dom-instagram', domain: 'instagram.com', cat: 'cat-social' },
-    { id: 'dom-facebook', domain: 'facebook.com', cat: 'cat-social' }
-  ];
+  // 9. Restricted Websites / Domains (Auto-Close Tab) - Seeded once only, never overrides user changes
+  const domainsSeeded = db.prepare("SELECT value FROM system_settings WHERE key = 'blocked_domains_initialized'").get();
+  if (!domainsSeeded) {
+    const defaultBlockedDomains = [
+      { id: 'dom-youtube', domain: 'youtube.com', cat: 'cat-youtube' },
+      { id: 'dom-chatgpt', domain: 'chatgpt.com', cat: 'cat-youtube' },
+      { id: 'dom-netflix', domain: 'netflix.com', cat: 'cat-ent' },
+      { id: 'dom-tiktok', domain: 'tiktok.com', cat: 'cat-social' },
+      { id: 'dom-instagram', domain: 'instagram.com', cat: 'cat-social' },
+      { id: 'dom-facebook', domain: 'facebook.com', cat: 'cat-social' }
+    ];
 
-  const insertDomain = db.prepare(`
-    INSERT INTO domains (id, domain, category_id, is_blocked)
-    VALUES (?, ?, ?, 1)
-    ON CONFLICT(domain) DO UPDATE SET is_blocked = 1
-  `);
+    const insertDomain = db.prepare(`
+      INSERT OR IGNORE INTO domains (id, domain, category_id, is_blocked)
+      VALUES (?, ?, ?, 1)
+    `);
 
-  for (const d of defaultBlockedDomains) {
-    insertDomain.run(d.id, d.domain, d.cat);
+    for (const d of defaultBlockedDomains) {
+      insertDomain.run(d.id, d.domain, d.cat);
+    }
+
+    db.prepare(`
+      INSERT INTO system_settings (key, value, description, updated_at)
+      VALUES ('blocked_domains_initialized', 'true', 'Default blocked domains initialized', ?)
+    `).run(nowIso);
   }
 
   // 10. Settings
