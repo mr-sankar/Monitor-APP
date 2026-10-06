@@ -83,9 +83,19 @@ const altFrontendDist = path.resolve(process.cwd(), 'frontend/dist');
 const activeDist = fs.existsSync(frontendDist) ? frontendDist : fs.existsSync(altFrontendDist) ? altFrontendDist : null;
 
 if (activeDist) {
-  app.use(express.static(activeDist));
+  app.use(express.static(activeDist, {
+    maxAge: '1d',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      }
+    }
+  }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(activeDist, 'index.html'));
   });
 }
@@ -141,6 +151,19 @@ if (process.env.NODE_ENV !== 'test') {
 
   enforceDataRetention();
   setInterval(enforceDataRetention, 24 * 60 * 60 * 1000);
+
+  // Keep-Alive Self-Ping: Prevents Render free-tier sleep during daytime
+  const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || 'https://kellamonitor-app.onrender.com';
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${keepAliveUrl}/health`);
+      if (res.ok) {
+        // Keeps container warm and active
+      }
+    } catch {
+      // Ignore background ping errors
+    }
+  }, 10 * 60 * 1000);
 }
 
 export default app;
