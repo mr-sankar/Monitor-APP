@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { db } from '../db/database.js';
 import { authenticateAdmin, AuthenticatedAdminRequest } from '../middleware/auth.js';
-import { getCompanyOverview } from '../services/aggregator.js';
+import { getCompanyOverview, updateDailySummary } from '../services/aggregator.js';
 
 export const dashboardRouter = Router();
 
@@ -561,9 +561,117 @@ dashboardRouter.get('/activity-feed', (req: AuthenticatedAdminRequest, res: Resp
     };
   });
 
+  // 3. Compute accurate full-day audited summary matching Reports & Export
+  const daySummary = {
+    totalInteractions: 0,
+    workSeconds: 0,
+    nonWorkSeconds: 0,
+    idleSeconds: 0
+  };
+
+  try {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    if (date === todayStr) {
+      try {
+        let refreshPairsQuery = `
+          SELECT DISTINCT employee_id, device_id 
+          FROM activity_events 
+          WHERE (start_time >= ? AND start_time <= ?) AND employee_id != 'emp-unassigned'
+        `;
+        const refreshParams: any[] = [startIso, endIso];
+        if (deviceId) {
+          refreshPairsQuery += ` AND device_id = ?`;
+          refreshParams.push(deviceId);
+        }
+        if (employeeId) {
+          refreshPairsQuery += ` AND employee_id = ?`;
+          refreshParams.push(employeeId);
+        }
+        const pairs = db.prepare(refreshPairsQuery).all(...refreshParams) as Array<{ employee_id: string; device_id: string }>;
+        for (const p of pairs) {
+          updateDailySummary(p.employee_id, p.device_id, date);
+        }
+      } catch (e) {}
+    }
+
+    // Query daily_summaries for audited metrics
+    let dsQuery = `
+      SELECT 
+        COALESCE(SUM(work_time_seconds), 0) as work_seconds,
+        COALESCE(SUM(non_work_time_seconds), 0) as non_work_seconds,
+        COALESCE(SUM(idle_time_seconds), 0) as idle_seconds
+      FROM daily_summaries
+      WHERE date = ? AND employee_id != 'emp-unassigned'
+    `;
+    const dsParams: any[] = [date];
+    if (deviceId) {
+      dsQuery += ` AND device_id = ?`;
+      dsParams.push(deviceId);
+    }
+    if (employeeId) {
+      dsQuery += ` AND employee_id = ?`;
+      dsParams.push(employeeId);
+    }
+    let dsRow = db.prepare(dsQuery).get(...dsParams) as any;
+
+    // Count true total events for this day
+    let countQuery = `
+      SELECT COUNT(*) as total_events
+      FROM activity_events
+      WHERE (start_time >= ? AND start_time <= ?)
+    `;
+    const countParams: any[] = [startIso, endIso];
+    if (deviceId) {
+      countQuery += ` AND device_id = ?`;
+      countParams.push(deviceId);
+    }
+    if (employeeId) {
+      countQuery += ` AND employee_id = ?`;
+      countParams.push(employeeId);
+    }
+    const countRow = db.prepare(countQuery).get(...countParams) as any;
+
+    // If summary row is missing but events exist, populate summary
+    if ((!dsRow || Number(dsRow.work_seconds) === 0) && countRow && Number(countRow.total_events) > 0) {
+      try {
+        let popPairsQuery = `
+          SELECT DISTINCT employee_id, device_id 
+          FROM activity_events 
+          WHERE (start_time >= ? AND start_time <= ?) AND employee_id != 'emp-unassigned'
+        `;
+        const popParams: any[] = [startIso, endIso];
+        if (deviceId) {
+          popPairsQuery += ` AND device_id = ?`;
+          popParams.push(deviceId);
+        }
+        if (employeeId) {
+          popPairsQuery += ` AND employee_id = ?`;
+          popParams.push(employeeId);
+        }
+        const pairs = db.prepare(popPairsQuery).all(...popParams) as Array<{ employee_id: string; device_id: string }>;
+        for (const p of pairs) {
+          updateDailySummary(p.employee_id, p.device_id, date);
+        }
+        dsRow = db.prepare(dsQuery).get(...dsParams) as any;
+      } catch (e) {}
+    }
+
+    if (dsRow) {
+      daySummary.workSeconds = Number(dsRow.work_seconds) || 0;
+      daySummary.nonWorkSeconds = Number(dsRow.non_work_seconds) || 0;
+      daySummary.idleSeconds = Number(dsRow.idle_seconds) || 0;
+    }
+    if (countRow) {
+      daySummary.totalInteractions = Number(countRow.total_events) || 0;
+    }
+  } catch (err) {
+    console.error('Failed to compute feed daySummary:', err);
+  }
+
   return res.json({
     date,
-    totalCount: activities.length,
+    totalCount: daySummary.totalInteractions || activities.length,
+    daySummary,
     currentActiveWindows,
     activities
   });
