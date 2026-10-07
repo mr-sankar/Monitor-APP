@@ -38,18 +38,19 @@ export function seedDatabase() {
 
   // 2. Administrators
   const adminSalt = bcrypt.genSaltSync(10);
-  const adminHash = bcrypt.hashSync('AdminPass123!', adminSalt);
+  const adminHash = bcrypt.hashSync('Sankar@990840', adminSalt);
   const nowIso = new Date().toISOString();
 
   const insertAdmin = db.prepare(`
-    INSERT OR IGNORE INTO administrators (id, email, password_hash, full_name, role_id, is_active, created_at)
+    INSERT INTO administrators (id, email, password_hash, full_name, role_id, is_active, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET email = excluded.email, password_hash = excluded.password_hash, full_name = excluded.full_name
   `);
   insertAdmin.run(
     'admin-1',
-    'admin@company.com',
+    'sankarkella0@gmail.com',
     adminHash,
-    'Enterprise Admin',
+    'Sankar Kella',
     'role-admin',
     1,
     nowIso
